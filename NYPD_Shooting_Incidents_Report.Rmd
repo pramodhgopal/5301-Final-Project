@@ -1,0 +1,89 @@
+---
+title: "NYPD_Shooting_Incidents_Report"
+author: "P.Gopal"
+date: "7/30/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Analysis of NYPD Shooting Incident Data
+
+This document contains a brief analysis of the data from the NYPD Shooting Incident Data (Historic) from the catalog.data.gov website. The intention is to provide an exploratory data analysis in a reproducible manner to ensure the validity of said analysis. In this document we shall import the data and try to analyse the incidents by the boroughs and by the years.
+
+Let's start by reading in the data from the catalog data website <https://catalog.data.gov/dataset> and seeing what we have.
+```{r get_jhu_data, message=FALSE, warning=FALSE}
+library(stringr)
+library(readr)
+library(dplyr)
+url_in <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD"
+nypd_incidents <- read.csv(url_in)
+```
+
+Lets clean up your data set by dropping the coordinates as well as the latitudes and longitudes columns. These will not be needed for our analysis and the data set will look cleaner.
+
+```{r pressure, echo=FALSE}
+df <- nypd_incidents[, -c(15:19)]
+```
+
+Now lets try to take a look at the shooting incidents through the years starting from 2006. We can simply create a new column in our cleaned data frame that simply takes in the year from the occur_date column and use this new column to aggregate the number of murders.
+``` {r}
+#format the occurance date in such a way we get it by year and add it as a new column in our cleaned data frame
+library(stringr)
+df$Year = str_sub(df$OCCUR_DATE, -4)
+## check if there are any Null or NA values in the year column
+sum(is.na(df$Year))
+```
+Now lets try to aggregate the number of shooting incidents and murders. Since the Year column doesn't have any NULL values, we can surmise that every shooting incident is associated with a year. This means that we simply need to find the frequency of "true" showing up in the STATISTICAL_MURDER_FLAG column for murders and aggregate it by the Year and Borough. We can also just use the frequency on the STATISTICAL_MURDER_FLAG column to get the number of incidents.
+``` {r}
+yearly_murders = aggregate(x= df$STATISTICAL_MURDER_FLAG, by=list(df$Year, df$BORO), FUN = function(STATISTICAL_MURDER_FLAG){sum(table(STATISTICAL_MURDER_FLAG)["true"])})
+colnames(yearly_murders) = c('Year', 'Borough', 'Murders')
+yearly_incidents = aggregate(x= df$STATISTICAL_MURDER_FLAG, by=list(df$Year, df$BORO), FUN = function(STATISTICAL_MURDER_FLAG){sum(table(STATISTICAL_MURDER_FLAG))})
+yearly_incidents = as.data.frame(yearly_incidents)
+colnames(yearly_incidents) = c('Year', 'Borough', 'Incidents')
+incidents_df <- merge(yearly_murders, yearly_incidents)
+incidents_df
+```
+
+From this data frame that we have created, lets do some initial analysis on the number of incidents by the Borough by plotting a simple graph that allows us to visualize the number of incidents by borough.
+
+```{r}
+library(ggplot2)
+barplot <- ggplot(data = incidents_df, aes(x= Borough, y= Incidents)) + geom_bar(stat = "identity", fill="steelblue") + labs(title = "Total shooting related incidents by Boroughs in New York city", x = "Borough", y="Incidents")
+barplot
+```
+
+
+Brooklyn seems to have the highest number of shooting incidents. Do we know if thats always been the case over the years? We shall plot out the number of murders over the years and group them by Boroughs. This way we can see if there are any consistencies in the Boroughs over the years from 2006.
+```{r}
+barplot2 <- ggplot(data = incidents_df, aes(x= Year, y= Murders, fill = Borough)) + geom_bar(stat="identity") + labs(title = "Total shooting related murders over the years in New York city", x = "Years", y="Murders")
+barplot2
+```
+
+
+Here we can see the number of Murders through the years grouped by their boroughs. We notice a gradual decrease over the years and then a sudden spike in 2020. We will touch more on this going forward. For now, we are interested to see if there is any relation between the number of incidents and number of murders. We will try to build a model prediction to see if there is a linear relation between shooting incidents and murders.
+
+```{r}
+# Try to establish a linear model between murders and shooting incidents
+mod <- lm(Murders ~ Incidents, data = incidents_df)
+# Add a new column where we predict the number of murders using the model from above
+incident_tot_w_pred <- incidents_df %>% mutate(pred = predict(mod))
+incident_tot_w_pred
+```
+The above model is an attempt at a simple linear model. This basically means we assume that if the number of incidents increase, we expect the number of murders to also increase in a linear fashion. Now lets try to plot the predicted murders on a graph with the actual number of murders and see how well our model did.
+
+```{r}
+incident_tot_w_pred %>% ggplot() + geom_point(aes(x=Incidents, y=Murders), color = "blue") + geom_point(aes(x=Incidents, y=pred), color = "red")  + labs(title = str_c("Model prediction - Murders by Incidents" ))
+```
+
+
+# Conclusion- Analysis and highlighting biases
+From our initial data analysis of the shooting incidents, we can see how the shootings are spread throughout the boroughs of New York City. Brooklyn has the most number of incidents while Staten Island has the least. This discovery raises some interesting question about the boroughs. Do we know if Brooklyn has always had the most incidents over the years? Were certain Boroughs getting better or worse over the years? What about the overall trend of the incidents? Were they gradually decreasing or increasing? How many of these shootings were actual murders?
+
+It was these very same questions that made me want to visualize the number of murders over the years and compare each borough. With the second graph we can conclude that 2006 was the deadliest year with 445 murders. We can visualize the gradual decrease in murders over the years from 2006, except for the sudden spike in the year 2020. This graph also allows us to see if each borough fared over the course of years. It seems Brooklyn has remained fairly consistent as the Borough with the most number of shooting related murders over the years. It also shows that Staten island has consistently had the least number of murders over years. The sudden spike in 2020 is really interesting. We can see that every borough did increase in the number of murders during this year, but murders in Brooklyn had increased more than any other borough. This once again raises more questions about this situation. What caused the sudden increase in 2020 when the covid was hitting the peak, particularly in Brooklyn? Was there less Police presence or response during 2020? How much impact did covid have, if any, on the rise in murders?
+
+These are some of the many questions that can't be answered without looking into an external data source. For now, I decided to look into the relationship of the number of shootings and murders and try to plot out my predictions. From the graph, we can see that the actual points are clustered pretty close to the predicted points with little to no outliers. This is good since we can conclude that the deaths and incidents are linearly related and can be confident when predicting the number of murders, given the amount of shootings.
+
+I am inclined to highlight a possible bias in this analysis. The population of the boroughs wasn't accounted for when contructing this report. One of the simple reasons that Brooklyn has more murders might simply be that it has way more population than the other boroughs. If we had the population of each borough, we might have been able to predict murder per population or murder per 1000 people. This would have been a better indicator of which borough had the most number of shootings/murder by population, which in turn could have been a better indicator of how dangerous a certain borough is. Another bias could be assuming there was less police response or presence in 2020 when questioning the sudden spike. I assumed that covid and the George Floyd protests that occured during 2020 might have had an effect on police response, so I questioned if any of these events could have effected the spike.  
