@@ -29,7 +29,7 @@ df <- nypd_incidents[, -c(15:19)]
 ```
 
 Now lets try to take a look at the shooting incidents through the years starting from 2006. We can simply create a new column in our cleaned data frame that simply takes in the year from the occur_date column and use this new column to aggregate the number of murders.
-``` {r}
+``` {r get_year, message=FALSE, warning=FALSE}
 #format the occurance date in such a way we get it by year and add it as a new column in our cleaned data frame
 library(stringr)
 df$Year = str_sub(df$OCCUR_DATE, -4)
@@ -37,44 +37,50 @@ df$Year = str_sub(df$OCCUR_DATE, -4)
 sum(is.na(df$Year))
 ```
 Now lets try to aggregate the number of shooting incidents and murders. Since the Year column doesn't have any NULL values, we can surmise that every shooting incident is associated with a year. This means that we simply need to find the frequency of "true" showing up in the STATISTICAL_MURDER_FLAG column for murders and aggregate it by the Year and Borough. We can also just use the frequency on the STATISTICAL_MURDER_FLAG column to get the number of incidents.
-``` {r}
+``` {r create_indcidents_df, message=FALSE, warning=FALSE}
 yearly_murders = aggregate(x= df$STATISTICAL_MURDER_FLAG, by=list(df$Year, df$BORO), FUN = function(STATISTICAL_MURDER_FLAG){sum(table(STATISTICAL_MURDER_FLAG)["true"])})
 colnames(yearly_murders) = c('Year', 'Borough', 'Murders')
 yearly_incidents = aggregate(x= df$STATISTICAL_MURDER_FLAG, by=list(df$Year, df$BORO), FUN = function(STATISTICAL_MURDER_FLAG){sum(table(STATISTICAL_MURDER_FLAG))})
 yearly_incidents = as.data.frame(yearly_incidents)
 colnames(yearly_incidents) = c('Year', 'Borough', 'Incidents')
 incidents_df <- merge(yearly_murders, yearly_incidents)
-incidents_df
+head(x = incidents_df, n = 10)
 ```
 
 From this data frame that we have created, lets do some initial analysis on the number of incidents by the Borough by plotting a simple graph that allows us to visualize the number of incidents by borough.
 
-```{r}
+```{r plot_incidents, message=FALSE, warning=FALSE }
 library(ggplot2)
-barplot <- ggplot(data = incidents_df, aes(x= Borough, y= Incidents)) + geom_bar(stat = "identity", fill="steelblue") + labs(title = "Total shooting related incidents by Boroughs in New York city", x = "Borough", y="Incidents")
+barplot <- ggplot(data = incidents_df, aes(x= Borough, y= Incidents)) + geom_bar(stat = "identity", fill="steelblue") + labs(title = "Shootings by Boroughs in New York city", x = "Borough", y="Incidents")
 barplot
 ```
 
+Let's do the same for the number of murders.
+```{r plot_murder, message=FALSE, warning=FALSE }
+murderplot <- ggplot(data = incidents_df, aes(x= Borough, y= Murders)) + geom_bar(stat = "identity", fill="#FF6666") + labs(title = "Murders by Boroughs in New York city", x = "Borough", y="Murders")
+murderplot
+```
 
-Brooklyn seems to have the highest number of shooting incidents. Do we know if thats always been the case over the years? We shall plot out the number of murders over the years and group them by Boroughs. This way we can see if there are any consistencies in the Boroughs over the years from 2006.
-```{r}
-barplot2 <- ggplot(data = incidents_df, aes(x= Year, y= Murders, fill = Borough)) + geom_bar(stat="identity") + labs(title = "Total shooting related murders over the years in New York city", x = "Years", y="Murders")
+
+Brooklyn seems to have the highest number of shooting incidents as well as murders. Do we know if that's always been the case over the years? For now, We shall plot out the number of murders over the years and group them by Boroughs. This way we can see if there are any consistencies in the Boroughs over the years from 2006.
+```{r plot_murders_years, message=FALSE, warning=FALSE}
+barplot2 <- ggplot(data = incidents_df, aes(x= Year, y= Murders, fill = Borough)) + geom_bar(stat="identity") + labs(title = "Total number of murders over the years", x = "Years", y="Murders")
 barplot2
 ```
 
 
 Here we can see the number of Murders through the years grouped by their boroughs. We notice a gradual decrease over the years and then a sudden spike in 2020. We will touch more on this going forward. For now, we are interested to see if there is any relation between the number of incidents and number of murders. We will try to build a model prediction to see if there is a linear relation between shooting incidents and murders.
 
-```{r}
+```{r model_predict, message=FALSE, warning=FALSE}
 # Try to establish a linear model between murders and shooting incidents
 mod <- lm(Murders ~ Incidents, data = incidents_df)
 # Add a new column where we predict the number of murders using the model from above
 incident_tot_w_pred <- incidents_df %>% mutate(pred = predict(mod))
-incident_tot_w_pred
+head(x = incident_tot_w_pred, n = 10)
 ```
 The above model is an attempt at a simple linear model. This basically means we assume that if the number of incidents increase, we expect the number of murders to also increase in a linear fashion. Now lets try to plot the predicted murders on a graph with the actual number of murders and see how well our model did.
 
-```{r}
+```{r plot_model, message=FALSE, warning=FALSE}
 incident_tot_w_pred %>% ggplot() + geom_point(aes(x=Incidents, y=Murders), color = "blue") + geom_point(aes(x=Incidents, y=pred), color = "red")  + labs(title = str_c("Model prediction - Murders by Incidents" ))
 ```
 
