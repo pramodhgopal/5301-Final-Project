@@ -7,6 +7,6 @@ The intention is to provide an exploratory data analysis in a reproducible manne
 
 The analysis was done in RStudio and the resulting Rmd file was saved to this repository.
 
-### The rmd document is meant to be used in RStudio to reproduce my findings from this data set.
+### The Rmd document is meant to be used in RStudio to reproduce my findings from this data set.
 
 Also included the powerpoint presentation for reference
