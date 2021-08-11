@@ -1,4 +1,4 @@
-# Final project for DTSA 5301 - Data Science as a Field (U. Colorado Boulder)
+# NYPD Shooting Incident Data Analysis
 
 
 This document contains a brief analysis of the data from the NYPD Shooting Incident Data (Historic) from the catalog.data.gov website. 
